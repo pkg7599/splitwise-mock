@@ -2,6 +2,8 @@ package internal
 
 import "github.com/gorilla/mux"
 
+
+
 func UserRouter(r *mux.Router, handler UserHandler) {
 	userRoute := r.PathPrefix("/user").Subrouter()
 	userRoute.HandleFunc("", handler.CreateUser).Methods("POST")

@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 )
 
 type IDao[T any] interface {
@@ -29,6 +30,7 @@ func DaoInit[T any](ctx *context.Context) (IDao[T], error) {
 	// init db client
 	dbClient, err := PostgresClientInit(ctx)
 	if err != nil {
+		Log.Error(fmt.Sprintf("dao initialization error: %s", err.Error()))
 		return nil, err
 	}
 	return &Dao[T]{
@@ -48,6 +50,9 @@ func (dao *Dao[T]) Create(entity interface{}) error {
 	dao.dbClient.StartSession()
 	result := dao.dbClient.DbClient().Create(entity)
 	dao.dbClient.CommitSession()
+	if result.Error != nil {
+		Log.Info(fmt.Sprintf("entity: %+v created", entity))
+	}
 	return result.Error
 }
 
@@ -58,6 +63,9 @@ func (dao *Dao[T]) Update(entity T) error {
 	dao.dbClient.StartSession()
 	result := dao.dbClient.DbClient().Save(entity)
 	dao.dbClient.CommitSession()
+	if result.Error != nil {
+		Log.Info(fmt.Sprintf("entity: %+v updated", entity))
+	}
 	return result.Error
 }
 
@@ -68,6 +76,9 @@ func (dao *Dao[T]) Delete(entity *T) error {
 	dao.dbClient.StartSession()
 	result := dao.dbClient.DbClient().Delete(entity)
 	dao.dbClient.CommitSession()
+	if result.Error != nil {
+		Log.Info(fmt.Sprintf("entity: %+v deleted", entity))
+	}
 	return result.Error
 }
 
@@ -78,5 +89,8 @@ func (dao *Dao[T]) Delete(entity *T) error {
 func (dao *Dao[T]) Read(filter map[string]interface{}) ([]T, error) {
 	var results []T
 	resp := dao.dbClient.DbClient().Where(filter).Find(&results)
+	if resp.Error != nil {
+		Log.Info(fmt.Sprintf("records Found: %d", len(results)))
+	}
 	return results, resp.Error
 }

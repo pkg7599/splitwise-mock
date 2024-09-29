@@ -12,8 +12,10 @@ type LenderService struct {
 }
 
 func LenderServiceInit() (*LenderService, error) {
+	Log.Info("lender service init...")
 	dao, err := DaoInit[Lend](nil)
 	if err != nil {
+		Log.Error(fmt.Sprintf("lender service init error: %s", err.Error()))
 		return nil, err
 	}
 	return &LenderService{dao: dao}, nil
@@ -31,6 +33,7 @@ func (ls *LenderService) GetBalance(userId1 uuid.UUID, userId2 uuid.UUID) (*Lend
 	dbClient.StartSession()
 	lenders, err := ls.dao.Read(map[string]interface{}{"l_id": lId})
 	if err != nil {
+		Log.Error(fmt.Sprintf("get balance error: %s", err.Error()))
 		return nil, err
 	}
 	if len(lenders) > 0 {
@@ -50,15 +53,18 @@ func (ls *LenderService) Upsert(lend *Lend) error {
 	dbClient := ls.dao.Client()
 	conflictField, err := GetDbFieldName("LId", lend)
 	if err != nil {
+		Log.Error(fmt.Sprintf("Upsert error: %s", err.Error()))
 		return err
 	}
 	updateField, err := GetDbFieldName("Amount", lend)
 	if err != nil {
+		Log.Error(fmt.Sprintf("get db field name error: %s", err.Error()))
 		return err
 	}
 
 	lenderIdName, err := GetDbFieldName("LenderId", lend)
 	if err != nil {
+		Log.Error(fmt.Sprintf("get db field name error: %s", err.Error()))
 		return err
 	}
 
@@ -72,6 +78,9 @@ func (ls *LenderService) Upsert(lend *Lend) error {
 			},
 		}),
 	}).Create(lend)
+	if resp.Error != nil {
+		Log.Info(fmt.Sprintf("upserted: %+v", lend))
+	}
 	return resp.Error
 }
 
@@ -80,8 +89,10 @@ type UserService struct {
 }
 
 func UserServiceInit() (*UserService, error) {
+	Log.Info("user service init...")
 	dao, err := DaoInit[User](nil)
 	if err != nil {
+		Log.Error(fmt.Sprintf("user service init error: %s", err.Error()))
 		return nil, err
 	}
 	return &UserService{dao: dao}, nil
@@ -117,8 +128,10 @@ type ExpenseService struct {
 }
 
 func ExpenseServiceInit() (*ExpenseService, error) {
+	Log.Info("expense service init...")
 	dao, err := DaoInit[Expense](nil)
 	if err != nil {
+		Log.Error(fmt.Sprintf("expense service init error: %s", err.Error()))
 		return nil, err
 	}
 	return &ExpenseService{dao: dao}, nil

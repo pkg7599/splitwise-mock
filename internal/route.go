@@ -2,6 +2,7 @@ package internal
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -15,6 +16,7 @@ type UserHandler struct {
 func NewUserHandler() (*UserHandler, error) {
 	userService, err := UserServiceInit()
 	if err != nil {
+		Log.Error(fmt.Sprintf("user service initialization error: %s", err.Error()))
 		return nil, err
 	}
 	return &UserHandler{service: userService}, nil
@@ -27,6 +29,7 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("create user error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -34,6 +37,7 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.Add(user.Name, user.Email, user.PhoneNo); err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("create user error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 	}
@@ -50,6 +54,7 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("get user error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -58,6 +63,7 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("get user error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -74,6 +80,7 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("delete user error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -81,6 +88,7 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	if err := h.service.Delete(uidParsed); err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("delete user error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -98,6 +106,7 @@ type ExpenseHandler struct {
 func NewExpenseHandler() (*ExpenseHandler, error) {
 	expenseService, err := ExpenseServiceInit()
 	if err != nil {
+		Log.Error(fmt.Sprintf("user service initialization error: %s", err.Error()))
 		return nil, err
 	}
 	lenderService, err := LenderServiceInit()
@@ -114,6 +123,7 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 	if err := json.NewDecoder(r.Body).Decode(&expenseRequest); err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("create expense error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -122,6 +132,7 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 	if err := Validate(expenseRequest); err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("create expense error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -165,6 +176,7 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 	} else {
 		statusCode = http.StatusBadRequest
 		errMsg := "error: expenseType should be in equal, percent, exact"
+		Log.Error(fmt.Sprintf("create expense error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -172,6 +184,7 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 	if err := es.service.Add(expenseType, amount, description, lenderId, expenseBorrowers); err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("create expense error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -184,6 +197,7 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 	if err := Parallelize(es.lenderService.Upsert, lenders); err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("create expense error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -202,6 +216,7 @@ func (es *ExpenseHandler) GetExpense(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("get expense error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -210,6 +225,7 @@ func (es *ExpenseHandler) GetExpense(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("get expense error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -225,6 +241,7 @@ type LenderHandler struct {
 func NewLenderHandler() (*LenderHandler, error) {
 	lenderService, err := LenderServiceInit()
 	if err != nil {
+		Log.Error(fmt.Sprintf("user service initialization error: %s", err.Error()))
 		return nil, err
 	}
 	return &LenderHandler{service: lenderService}, nil
@@ -240,6 +257,7 @@ func (lh *LenderHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("get balance error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -248,6 +266,7 @@ func (lh *LenderHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("get balance error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -256,6 +275,7 @@ func (lh *LenderHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("get balance error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -272,6 +292,7 @@ func (lh *LenderHandler) GetLendSummary(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("get lend summary error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
@@ -280,6 +301,7 @@ func (lh *LenderHandler) GetLendSummary(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("get lend summary error: %s", errMsg))
 		w.WriteHeader(statusCode)
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
