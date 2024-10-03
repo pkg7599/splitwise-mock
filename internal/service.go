@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -21,17 +22,17 @@ func LenderServiceInit() (*LenderService, error) {
 	return &LenderService{dao: dao}, nil
 }
 
-func (ls *LenderService) Add(borrowerId uuid.UUID, lenderId uuid.UUID, amount float64) error {
+func (ls *LenderService) Add(ctx *context.Context, borrowerId uuid.UUID, lenderId uuid.UUID, amount float64) error {
 	var lend *Lend = NewLender(lenderId, borrowerId, amount)
-	return ls.dao.Create(&lend)
+	return ls.dao.Create(ctx, &lend)
 }
 
-func (ls *LenderService) GetBalance(userId1 uuid.UUID, userId2 uuid.UUID) (*Lend, error) {
+func (ls *LenderService) GetBalance(ctx *context.Context, userId1 uuid.UUID, userId2 uuid.UUID) (*Lend, error) {
 	var lend Lend
 	lId := GenerateUUIDFromUUIDs(userId1, userId2)
-	dbClient := ls.dao.Client()
-	dbClient.StartSession()
-	lenders, err := ls.dao.Read(map[string]interface{}{"l_id": lId})
+	dbClient := ls.dao.Client(ctx)
+	dbClient.StartSession(ctx)
+	lenders, err := ls.dao.Read(ctx, map[string]interface{}{"l_id": lId})
 	if err != nil {
 		Log.Error(fmt.Sprintf("get balance error: %s", err.Error()))
 		return nil, err
@@ -42,15 +43,15 @@ func (ls *LenderService) GetBalance(userId1 uuid.UUID, userId2 uuid.UUID) (*Lend
 	return &lend, nil
 }
 
-func (ls *LenderService) GetLendSummary(userId uuid.UUID) ([]*Lend, error) {
+func (ls *LenderService) GetLendSummary(ctx *context.Context, userId uuid.UUID) ([]*Lend, error) {
 	var lends []*Lend
-	dbClient := ls.dao.Client()
-	resp := dbClient.DbClient().Where("lender_id = ? OR borrower_id = ?", userId, userId).Find(&lends)
+	dbClient := ls.dao.Client(ctx)
+	resp := dbClient.DbClient(ctx).Where("lender_id = ? OR borrower_id = ?", userId, userId).Find(&lends)
 	return lends, resp.Error
 }
 
-func (ls *LenderService) Upsert(lend *Lend) error {
-	dbClient := ls.dao.Client()
+func (ls *LenderService) Upsert(ctx *context.Context, lend *Lend) error {
+	dbClient := ls.dao.Client(ctx)
 	conflictField, err := GetDbFieldName("LId", lend)
 	if err != nil {
 		Log.Error(fmt.Sprintf("Upsert error: %s", err.Error()))
@@ -68,8 +69,8 @@ func (ls *LenderService) Upsert(lend *Lend) error {
 		return err
 	}
 
-	dbClient.StartSession()
-	resp := dbClient.DbClient().Clauses(clause.OnConflict{
+	dbClient.StartSession(ctx)
+	resp := dbClient.DbClient(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: conflictField}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
 			updateField: clause.Expr{
@@ -98,26 +99,26 @@ func UserServiceInit() (*UserService, error) {
 	return &UserService{dao: dao}, nil
 }
 
-func (us *UserService) Add(name string, email string, phone string) error {
+func (us *UserService) Add(ctx *context.Context, name string, email string, phone string) error {
 	var user *User = NewUser(name, email, phone)
-	if err := us.dao.Create(&user); err != nil {
+	if err := us.dao.Create(ctx, &user); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (us *UserService) Get(id uuid.UUID) (*User, error) {
-	user, err := us.dao.Read(map[string]interface{}{"uid": id})
+func (us *UserService) Get(ctx *context.Context, id uuid.UUID) (*User, error) {
+	user, err := us.dao.Read(ctx, map[string]interface{}{"uid": id})
 	if err != nil {
 		return nil, err
 	}
 	return &user[0], nil
 }
 
-func (us *UserService) Delete(id uuid.UUID) error {
+func (us *UserService) Delete(ctx *context.Context, id uuid.UUID) error {
 	user := User{UId: id}
-	if err := us.dao.Delete(&user); err != nil {
+	if err := us.dao.Delete(ctx, &user); err != nil {
 		return err
 	}
 	return nil
@@ -138,18 +139,18 @@ func ExpenseServiceInit() (*ExpenseService, error) {
 }
 
 func (es *ExpenseService) Add(
-	category string, amount float64, description string, lenderId uuid.UUID, expenseBorrowers []*ExpenseBorrower,
+	ctx *context.Context, category string, amount float64, description string, lenderId uuid.UUID, expenseBorrowers []*ExpenseBorrower,
 ) error {
 	var expense *Expense = NewExpense(category, amount, description, lenderId, expenseBorrowers)
-	if err := es.dao.Create(&expense); err != nil {
+	if err := es.dao.Create(ctx, &expense); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (es *ExpenseService) Get(id uuid.UUID) (*Expense, error) {
-	expense, err := es.dao.Read(map[string]interface{}{"ex_id": id})
+func (es *ExpenseService) Get(ctx *context.Context, id uuid.UUID) (*Expense, error) {
+	expense, err := es.dao.Read(ctx, map[string]interface{}{"ex_id": id})
 	if err != nil {
 		return nil, err
 	}

@@ -75,8 +75,7 @@ func (api *ApiImpl) Init() error {
 	}
 	ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 	defer cancel()
-	db.SetContext(&ctx)
-	if err := db.Ping(); err != nil {
+	if err := db.Ping(&ctx); err != nil {
 		log.Error(fmt.Sprintf("error occurred in db connection: %s", err))
 		return err
 	}
@@ -98,8 +97,7 @@ func (api *ApiImpl) Init() error {
 		db.SetContext(&rqstContext)
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
-		db.SetContext(&ctx)
-		if err := db.Ping(); err != nil {
+		if err := db.Ping(&ctx); err != nil {
 			msg = err.Error()
 			log.Error(fmt.Sprintf("error occurred in health check: %s", msg))
 			status = 500

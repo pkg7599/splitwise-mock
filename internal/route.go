@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -23,9 +24,10 @@ func NewUserHandler() (*UserHandler, error) {
 }
 
 func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
-	var user User
-	var statusCode int = http.StatusOK
 	w.Header().Set("Content-Type", "application/json")
+	var statusCode int = http.StatusOK
+	var ctx context.Context = r.Context()
+	var user User
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := err.Error()
@@ -34,7 +36,7 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
 	}
-	if err := h.service.Add(user.Name, user.Email, user.PhoneNo); err != nil {
+	if err := h.service.Add(&ctx, user.Name, user.Email, user.PhoneNo); err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
 		Log.Error(fmt.Sprintf("create user error: %s", errMsg))
@@ -47,9 +49,10 @@ func (h *UserHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	var params map[string]string = mux.Vars(r)
 	var statusCode int = http.StatusOK
-	w.Header().Set("Content-Type", "application/json")
+	var ctx context.Context = r.Context()
 	uidParsed, err := uuid.Parse(params["uid"])
 	if err != nil {
 		statusCode = http.StatusBadRequest
@@ -59,7 +62,7 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
 	}
-	user, err := h.service.Get(uidParsed)
+	user, err := h.service.Get(&ctx, uidParsed)
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
@@ -73,9 +76,11 @@ func (h *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
-	var params map[string]string = mux.Vars(r)
-	var statusCode int = http.StatusOK
 	w.Header().Set("Content-Type", "application/json")
+	var statusCode int = http.StatusOK
+	var ctx context.Context = r.Context()
+	var params map[string]string = mux.Vars(r)
+
 	uidParsed, err := uuid.Parse(params["uid"])
 	if err != nil {
 		statusCode = http.StatusBadRequest
@@ -85,7 +90,7 @@ func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
 	}
-	if err := h.service.Delete(uidParsed); err != nil {
+	if err := h.service.Delete(&ctx, uidParsed); err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
 		Log.Error(fmt.Sprintf("delete user error: %s", errMsg))
@@ -120,6 +125,7 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 	var expenseRequest ExpenseRequest
 	var statusCode int = http.StatusOK
+	var ctx context.Context = r.Context()
 	if err := json.NewDecoder(r.Body).Decode(&expenseRequest); err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := err.Error()
@@ -181,7 +187,7 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
 	}
-	if err := es.service.Add(expenseType, amount, description, lenderId, expenseBorrowers); err != nil {
+	if err := es.service.Add(&ctx, expenseType, amount, description, lenderId, expenseBorrowers); err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
 		Log.Error(fmt.Sprintf("create expense error: %s", errMsg))
@@ -194,7 +200,7 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 		lenders = append(lenders, NewLender(lenderId, expenseBorrower.BorrowerId, expenseBorrower.Amount))
 	}
 
-	if err := Parallelize(es.lenderService.Upsert, lenders); err != nil {
+	if err := Parallelize(&ctx, es.lenderService.Upsert, lenders); err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
 		Log.Error(fmt.Sprintf("create expense error: %s", errMsg))
@@ -209,9 +215,10 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 }
 
 func (es *ExpenseHandler) GetExpense(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	var params map[string]string = mux.Vars(r)
 	var statusCode int = http.StatusOK
-	w.Header().Set("Content-Type", "application/json")
+	var ctx context.Context = r.Context()
 	uidParsed, err := ParseUUIDString(params["exId"])
 	if err != nil {
 		statusCode = http.StatusBadRequest
@@ -221,7 +228,7 @@ func (es *ExpenseHandler) GetExpense(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
 	}
-	expense, err := es.service.Get(*uidParsed)
+	expense, err := es.service.Get(&ctx, *uidParsed)
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
@@ -248,11 +255,12 @@ func NewLenderHandler() (*LenderHandler, error) {
 }
 
 func (lh *LenderHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var statusCode int = http.StatusOK
+	var ctx context.Context = r.Context()
 	queryParams := r.URL.Query()
 	userId1 := queryParams.Get("userId1")
 	userId2 := queryParams.Get("userId2")
-	var statusCode int = http.StatusOK
-	w.Header().Set("Content-Type", "application/json")
 	userId1Parsed, err := ParseUUIDString(userId1)
 	if err != nil {
 		statusCode = http.StatusBadRequest
@@ -271,7 +279,7 @@ func (lh *LenderHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
 	}
-	lender, err := lh.service.GetBalance(*userId1Parsed, *userId2Parsed)
+	lender, err := lh.service.GetBalance(&ctx, *userId1Parsed, *userId2Parsed)
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
@@ -285,9 +293,10 @@ func (lh *LenderHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (lh *LenderHandler) GetLendSummary(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	var params map[string]string = mux.Vars(r)
 	var statusCode int = http.StatusOK
-	w.Header().Set("Content-Type", "application/json")
+	var ctx context.Context = r.Context()
 	uidParsed, err := ParseUUIDString(params["userId"])
 	if err != nil {
 		statusCode = http.StatusBadRequest
@@ -297,7 +306,7 @@ func (lh *LenderHandler) GetLendSummary(w http.ResponseWriter, r *http.Request) 
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
 	}
-	lenders, err := lh.service.GetLendSummary(*uidParsed)
+	lenders, err := lh.service.GetLendSummary(&ctx, *uidParsed)
 	if err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()

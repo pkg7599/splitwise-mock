@@ -1,13 +1,14 @@
 package internal
 
 import (
+	"context"
 	"sync"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm/schema"
 )
 
-type Function[T interface{}] func(T) error
+type Function[T interface{}] func(*context.Context, T) error
 
 func ParseUUIDString(uid string) (*uuid.UUID, error) {
 	uidParsed, err := uuid.Parse(uid)
@@ -79,11 +80,11 @@ func GetDbFieldName(fieldName string, entity interface{}) (string, error) {
 // @param fn Function to run
 // @param inputs Inputs to pass to the function
 // @return error If any of the tasks return an error
-func Parallelize[I interface{}](fn Function[I], inputs []I) error {
+func Parallelize[I interface{}](ctx *context.Context, fn Function[I], inputs []I) error {
 	errCh := make(chan error, len(inputs))
 	for _, input := range inputs {
 		go func() {
-			errCh <- fn(input)
+			errCh <- fn(ctx, input)
 		}()
 	}
 	for range inputs {

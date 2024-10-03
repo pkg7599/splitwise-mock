@@ -11,13 +11,13 @@ import (
 )
 
 type IClient interface {
-	DbClient() *gorm.DB
+	DbClient(*context.Context) *gorm.DB
 	SetContext(*context.Context)
 	ResetContext()
-	StartSession() error
+	StartSession(*context.Context) error
 	CommitSession() error
 	AbortSession() error
-	Ping() error
+	Ping(*context.Context) error
 }
 
 type PostgresClient struct {
@@ -63,13 +63,21 @@ func PostgresClientInit(ctx *context.Context) (IClient, error) {
 	}, nil
 }
 
-func (c *PostgresClient) DbClient() *gorm.DB {
+func (c *PostgresClient) DbClient(ctx *context.Context) *gorm.DB {
+	if ctx != nil {
+		c.SetContext(ctx)
+	}
 	return c.Client
 }
 
 func (c *PostgresClient) SetContext(ctx *context.Context) {
+	if ctx == nil {
+		context := context.TODO()
+		ctx = &context
+	}
 	Log.Info("Setting new context for PostgresClient")
 	c.ctx = ctx
+	c.Client = c.Client.WithContext(*c.ctx)
 }
 
 func (c *PostgresClient) ResetContext() {
@@ -78,7 +86,8 @@ func (c *PostgresClient) ResetContext() {
 	c.ctx = &ctx
 }
 
-func (c *PostgresClient) StartSession() error {
+func (c *PostgresClient) StartSession(ctx *context.Context) error {
+	c.SetContext(ctx)
 	c.session = c.Client.WithContext(*c.ctx).Begin()
 	Log.Info("Starting new session for PostgresClient")
 	return c.session.Error
@@ -96,8 +105,9 @@ func (c *PostgresClient) AbortSession() error {
 	return db.Error
 }
 
-func (c *PostgresClient) Ping() error {
+func (c *PostgresClient) Ping(ctx *context.Context) error {
 	db, err := c.Client.DB()
+	c.SetContext(ctx)
 	if err != nil {
 		Log.Error(fmt.Sprintf("postgres client ping error: %s", err.Error()))
 		return err
@@ -116,7 +126,7 @@ func MigrateSchema(c IClient) error {
 	}
 
 	for _, schema := range schemas {
-		err := c.DbClient().AutoMigrate(schema)
+		err := c.DbClient(nil).AutoMigrate(schema)
 		if err != nil {
 			Log.Error(fmt.Sprintf("postgres client migrate schema error: %s", err.Error()))
 			return err

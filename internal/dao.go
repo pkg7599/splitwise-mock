@@ -6,11 +6,11 @@ import (
 )
 
 type IDao[T any] interface {
-	Client() IClient
-	Create(interface{}) error
-	Update(T) error
-	Delete(*T) error
-	Read(map[string]interface{}) ([]T, error)
+	Client(*context.Context) IClient
+	Create(*context.Context, interface{}) error
+	Update(*context.Context, T) error
+	Delete(*context.Context, *T) error
+	Read(*context.Context, map[string]interface{}) ([]T, error)
 }
 
 type Dao[T any] struct {
@@ -39,16 +39,17 @@ func DaoInit[T any](ctx *context.Context) (IDao[T], error) {
 	}, nil
 }
 
-func (dao *Dao[T]) Client() IClient {
+func (dao *Dao[T]) Client(ctx *context.Context) IClient {
 	return dao.dbClient
 }
 
 // Create a new entity
+// @param ctx *context.Context: Context
 // @param entity interface{}: The entity to create
 // @return error: The error if any
-func (dao *Dao[T]) Create(entity interface{}) error {
-	dao.dbClient.StartSession()
-	result := dao.dbClient.DbClient().Create(entity)
+func (dao *Dao[T]) Create(ctx *context.Context, entity interface{}) error {
+	dao.dbClient.StartSession(ctx)
+	result := dao.dbClient.DbClient(ctx).Create(entity)
 	dao.dbClient.CommitSession()
 	if result.Error != nil {
 		Log.Info(fmt.Sprintf("entity: %+v created", entity))
@@ -57,11 +58,12 @@ func (dao *Dao[T]) Create(entity interface{}) error {
 }
 
 // Update entity
+// @param ctx *context.Context: Context
 // @param entity interface{}: The entity to update
 // @return error: The error if any
-func (dao *Dao[T]) Update(entity T) error {
-	dao.dbClient.StartSession()
-	result := dao.dbClient.DbClient().Save(entity)
+func (dao *Dao[T]) Update(ctx *context.Context, entity T) error {
+	dao.dbClient.StartSession(ctx)
+	result := dao.dbClient.DbClient(ctx).Save(entity)
 	dao.dbClient.CommitSession()
 	if result.Error != nil {
 		Log.Info(fmt.Sprintf("entity: %+v updated", entity))
@@ -70,11 +72,12 @@ func (dao *Dao[T]) Update(entity T) error {
 }
 
 // Delete entity
+// @param ctx *context.Context: Context
 // @param entity interface{}: The entity to delete
 // @return error: The error if any
-func (dao *Dao[T]) Delete(entity *T) error {
-	dao.dbClient.StartSession()
-	result := dao.dbClient.DbClient().Delete(entity)
+func (dao *Dao[T]) Delete(ctx *context.Context, entity *T) error {
+	dao.dbClient.StartSession(ctx)
+	result := dao.dbClient.DbClient(ctx).Delete(entity)
 	dao.dbClient.CommitSession()
 	if result.Error != nil {
 		Log.Info(fmt.Sprintf("entity: %+v deleted", entity))
@@ -83,12 +86,13 @@ func (dao *Dao[T]) Delete(entity *T) error {
 }
 
 // Read entities
+// @param ctx *context.Context: Context
 // @param filter map[string]interface{}: The filter to apply
 // @return []T: Search Result
 // @return error: The error if any
-func (dao *Dao[T]) Read(filter map[string]interface{}) ([]T, error) {
+func (dao *Dao[T]) Read(ctx *context.Context, filter map[string]interface{}) ([]T, error) {
 	var results []T
-	resp := dao.dbClient.DbClient().Where(filter).Find(&results)
+	resp := dao.dbClient.DbClient(ctx).Where(filter).Find(&results)
 	if resp.Error != nil {
 		Log.Info(fmt.Sprintf("records Found: %d", len(results)))
 	}
