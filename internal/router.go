@@ -2,8 +2,6 @@ package internal
 
 import "github.com/gorilla/mux"
 
-
-
 func UserRouter(r *mux.Router, handler UserHandler) {
 	userRoute := r.PathPrefix("/user").Subrouter()
 	userRoute.HandleFunc("", handler.CreateUser).Methods("POST")
@@ -19,6 +17,7 @@ func ExpenseRouter(r *mux.Router, handler ExpenseHandler) {
 
 func LenderRouter(r *mux.Router, handler LenderHandler) {
 	lenderRoute := r.PathPrefix("/lender").Subrouter()
-	lenderRoute.HandleFunc("/", handler.GetBalance).Methods("GET")
+	lenderRoute.HandleFunc("", handler.GetBalance).Methods("GET")
 	lenderRoute.HandleFunc("/{userId}", handler.GetLendSummary).Methods("GET")
+	lenderRoute.HandleFunc("", handler.UpdatePayment).Methods("PUT")
 }

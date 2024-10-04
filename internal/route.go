@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
@@ -317,4 +318,43 @@ func (lh *LenderHandler) GetLendSummary(w http.ResponseWriter, r *http.Request) 
 	}
 	w.WriteHeader(statusCode)
 	json.NewEncoder(w).Encode(SuccessResp(&statusCode, nil, lenders))
+}
+
+func (lh *LenderHandler) UpdatePayment(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var statusCode int = http.StatusOK
+	successMsg := "payment recieved"
+	var ctx context.Context = r.Context()
+	queryParams := r.URL.Query()
+	lId := queryParams.Get("userId1")
+	bId := queryParams.Get("userId2")
+	lIdParsed, err1 := ParseUUIDString(lId)
+	bIdParsed, err2 := ParseUUIDString(bId)
+	if err1 != nil || err2 != nil {
+		statusCode = http.StatusBadRequest
+		errMsg := "error: invalid lenderId or borrowerId"
+		Log.Error(fmt.Sprintf("update expense error: %s", errMsg))
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
+		return
+	}
+	amount, err := strconv.ParseFloat(queryParams.Get("amount"), 64)
+	if err != nil {
+		statusCode = http.StatusBadRequest
+		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("update expense error: %s", errMsg))
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
+		return
+	}
+	if err = lh.service.UpdatePayment(&ctx, *lIdParsed, *bIdParsed, amount); err != nil {
+		statusCode = http.StatusInternalServerError
+		errMsg := err.Error()
+		Log.Error(fmt.Sprintf("update expense error: %s", errMsg))
+		w.WriteHeader(statusCode)
+		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
+		return
+	}
+	w.WriteHeader(statusCode)
+	json.NewEncoder(w).Encode(SuccessResp(&statusCode, &successMsg, nil))
 }

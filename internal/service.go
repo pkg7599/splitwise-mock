@@ -50,6 +50,21 @@ func (ls *LenderService) GetLendSummary(ctx *context.Context, userId uuid.UUID) 
 	return lends, resp.Error
 }
 
+func (ls *LenderService) UpdatePayment(ctx *context.Context, lenderId uuid.UUID, borrowerId uuid.UUID, amount float64) error {
+	lend, err := ls.GetBalance(ctx, lenderId, borrowerId)
+	if err != nil {
+		return err
+	}
+	if lend.Amount != amount {
+		return fmt.Errorf("amount mismatch error: amount due: %f", lend.Amount)
+	}
+	dbClient := ls.dao.Client(ctx)
+	dbClient.StartSession(ctx)
+	resp := dbClient.DbClient(ctx).Model(lend).Update("amount", 0)
+	dbClient.CommitSession()
+	return resp.Error
+}
+
 func (ls *LenderService) Upsert(ctx *context.Context, lend *Lend) error {
 	dbClient := ls.dao.Client(ctx)
 	conflictField, err := GetDbFieldName("LId", lend)
