@@ -326,8 +326,8 @@ func (lh *LenderHandler) UpdatePayment(w http.ResponseWriter, r *http.Request) {
 	successMsg := "payment recieved"
 	var ctx context.Context = r.Context()
 	queryParams := r.URL.Query()
-	lId := queryParams.Get("userId1")
-	bId := queryParams.Get("userId2")
+	lId := queryParams.Get("lenderId")
+	bId := queryParams.Get("borrowerId")
 	lIdParsed, err1 := ParseUUIDString(lId)
 	bIdParsed, err2 := ParseUUIDString(bId)
 	if err1 != nil || err2 != nil {

@@ -34,7 +34,7 @@ type Lend struct {
 	Lender     User      `json:"-" gorm:"foreignKey:LenderId"`
 	BorrowerId uuid.UUID `json:"borrowerId,omitempty" gorm:"type:uuid"`
 	Borrower   User      `json:"-" gorm:"foreignKey:BorrowerId"`
-	Amount     float64   `default:"0" json:"amount,omitempty"`
+	Amount     float64   `default:"0" json:"amount"`
 	UpdatedAt  time.Time `json:"updatedAt,omitempty"`
 }
 
@@ -102,6 +102,7 @@ type ExpenseBorrower struct {
 	BorrowerId uuid.UUID `json:"borrowerId,omitempty" gorm:"primaryKey;type:uuid"`
 	Borrower   User      `json:"-" gorm:"foreignKey:BorrowerId"`
 	Amount     float64   `json:"amount,omitempty"`
+	IsPaid     bool      `json:"isPaid,omitempty" gorm:"default:false"`
 }
 
 func NewExpenseBorrower(expenseId uuid.UUID, borrowerId uuid.UUID, amount float64) *ExpenseBorrower {

@@ -32,7 +32,11 @@ func (ls *LenderService) GetBalance(ctx *context.Context, userId1 uuid.UUID, use
 	lId := GenerateUUIDFromUUIDs(userId1, userId2)
 	dbClient := ls.dao.Client(ctx)
 	dbClient.StartSession(ctx)
-	lenders, err := ls.dao.Read(ctx, map[string]interface{}{"l_id": lId})
+	lIdName, err := GetDbFieldName("LId", lend)
+	if err != nil {
+		return nil, err
+	}
+	lenders, err := ls.dao.Read(ctx, map[string]interface{}{lIdName: lId})
 	if err != nil {
 		Log.Error(fmt.Sprintf("get balance error: %s", err.Error()))
 		return nil, err
@@ -46,23 +50,46 @@ func (ls *LenderService) GetBalance(ctx *context.Context, userId1 uuid.UUID, use
 func (ls *LenderService) GetLendSummary(ctx *context.Context, userId uuid.UUID) ([]*Lend, error) {
 	var lends []*Lend
 	dbClient := ls.dao.Client(ctx)
-	resp := dbClient.DbClient(ctx).Where("lender_id = ? OR borrower_id = ?", userId, userId).Find(&lends)
+	lenderIdFieldName, err := GetDbFieldName("LenderId", lends)
+	if err != nil {
+		return nil, err
+	}
+	borrowerIdFieldName, err := GetDbFieldName("BorrowerId", lends)
+	if err != nil {
+		return nil, err
+	}
+	resp := dbClient.DbClient(ctx).Where("? = ? OR ? = ?", lenderIdFieldName, borrowerIdFieldName, userId, userId).Find(&lends)
 	return lends, resp.Error
 }
 
 func (ls *LenderService) UpdatePayment(ctx *context.Context, lenderId uuid.UUID, borrowerId uuid.UUID, amount float64) error {
+	es, err := ExpenseServiceInit()
+	if err != nil {
+		return err
+	}
 	lend, err := ls.GetBalance(ctx, lenderId, borrowerId)
 	if err != nil {
 		return err
 	}
-	if lend.Amount != amount {
+	if lend.Amount != amount && lend.LenderId == lenderId {
 		return fmt.Errorf("amount mismatch error: amount due: %f", lend.Amount)
+	} else if lend.Amount != -amount && lend.LenderId == borrowerId {
+		return fmt.Errorf("amount mismatch error: amount due: %f", -lend.Amount)
 	}
 	dbClient := ls.dao.Client(ctx)
 	dbClient.StartSession(ctx)
 	resp := dbClient.DbClient(ctx).Model(lend).Update("amount", 0)
+	if resp.Error != nil {
+		dbClient.AbortSession()
+		return resp.Error
+	}
+	err = es.UpdatePayment(ctx, lenderId, borrowerId)
+	if err != nil {
+		dbClient.AbortSession()
+		return err
+	}
 	dbClient.CommitSession()
-	return resp.Error
+	return nil
 }
 
 func (ls *LenderService) Upsert(ctx *context.Context, lend *Lend) error {
@@ -170,4 +197,45 @@ func (es *ExpenseService) Get(ctx *context.Context, id uuid.UUID) (*Expense, err
 		return nil, err
 	}
 	return &expense[0], nil
+}
+
+func (es *ExpenseService) UpdatePayment(ctx *context.Context, lenderId uuid.UUID, borrowerId uuid.UUID) error {
+	var expenseBorrowers []ExpenseBorrower
+	dbClient := es.dao.Client(ctx).DbClient(ctx)
+	lenderIdFieldName, err := GetDbFieldName("LenderId", Lend{})
+	if err != nil {
+		return err
+	}
+	expenseIdFieldName, err := GetDbFieldName("ExpenseId", expenseBorrowers)
+	if err != nil {
+		return err
+	}
+	exIdFieldName, err := GetDbFieldName("ExId", Expense{})
+	if err != nil {
+		return err
+	}
+	borrowerIdFieldName, err := GetDbFieldName("BorrowerId", expenseBorrowers)
+	if err != nil {
+		return err
+	}
+	resp := dbClient.Model(&expenseBorrowers).Joins("JOIN expenses ON expense_borrowers." + expenseIdFieldName + " = expenses." + exIdFieldName).Where(
+		map[string]interface{}{
+			"expenses." + lenderIdFieldName:            lenderId,
+			"expense_borrowers." + borrowerIdFieldName: borrowerId,
+		},
+	).Find(&expenseBorrowers)
+	if resp.Error != nil {
+		return resp.Error
+	}
+
+	var expenseIds []uuid.UUID
+	for expenseBorrower := range expenseBorrowers {
+		expenseIds = append(expenseIds, expenseBorrowers[expenseBorrower].ExpenseId)
+	}
+	isPaidFieldName, err := GetDbFieldName("IsPaid", expenseBorrowers)
+	if err != nil {
+		return err
+	}
+	resp = dbClient.Model(ExpenseBorrower{}).Where(expenseIdFieldName+" IN ? AND "+borrowerIdFieldName+" = ?", expenseIds, borrowerId).Update(isPaidFieldName, true)
+	return resp.Error
 }
