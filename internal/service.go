@@ -166,6 +166,89 @@ func (us *UserService) Delete(ctx *context.Context, id uuid.UUID) error {
 	return nil
 }
 
+type ISplitAmount interface {
+	SplitAmount() []*ExpenseBorrower
+}
+
+type EqualSplitAmount struct {
+	expenseRequest ExpenseRequest
+}
+
+func (ss *EqualSplitAmount) SplitAmount() []*ExpenseBorrower {
+	users := ss.expenseRequest.Users
+	amount := ss.expenseRequest.Amount
+	lenderId := ss.expenseRequest.LenderId
+	var expenseBorrowers []*ExpenseBorrower
+	splitAmount := amount / float64(len(users))
+	for _, userId := range users {
+		if userId == lenderId {
+			continue
+		}
+		expenseBorrowers = append(expenseBorrowers, &ExpenseBorrower{
+			BorrowerId: userId,
+			Amount:     splitAmount,
+		})
+	}
+	return expenseBorrowers
+}
+
+type ExactSplitAmount struct {
+	expenseRequest ExpenseRequest
+}
+
+func (ss *ExactSplitAmount) SplitAmount() []*ExpenseBorrower {
+	users := ss.expenseRequest.Users
+	values := ss.expenseRequest.Values
+	var expenseBorrowers []*ExpenseBorrower
+	for i, userId := range users {
+		expenseBorrowers = append(expenseBorrowers, &ExpenseBorrower{
+			BorrowerId: userId,
+			Amount:     values[i],
+		})
+	}
+	return expenseBorrowers
+}
+
+type PercentSplitAmount struct {
+	expenseRequest ExpenseRequest
+}
+
+func (ss *PercentSplitAmount) SplitAmount() []*ExpenseBorrower {
+	var expenseBorrowers []*ExpenseBorrower
+	users := ss.expenseRequest.Users
+	amount := ss.expenseRequest.Amount
+	percents := ss.expenseRequest.Percents
+	lenderId := ss.expenseRequest.LenderId
+	for i, userId := range users {
+		if userId == lenderId {
+			continue
+		}
+		splitAmount := percents[i] * amount / 100
+		expenseBorrowers = append(expenseBorrowers, &ExpenseBorrower{
+			BorrowerId: userId,
+			Amount:     splitAmount,
+		})
+	}
+	return expenseBorrowers
+}
+
+// Initializes the Split Service Based on expense Type in request
+// @param ExpenseRequest
+// @return SplitService
+// @return error: Error if expense type is not valid
+func SplitServiceInit(expenseRequest ExpenseRequest) (ISplitAmount, error) {
+	expenseType := expenseRequest.Type
+	switch expenseType {
+	case "equal":
+		return &EqualSplitAmount{expenseRequest: expenseRequest}, nil
+	case "exact":
+		return &ExactSplitAmount{expenseRequest: expenseRequest}, nil
+	case "percent":
+		return &PercentSplitAmount{expenseRequest: expenseRequest}, nil
+	}
+	return nil, fmt.Errorf("invalid expense type: %s", expenseType)
+}
+
 type ExpenseService struct {
 	dao IDao[Expense]
 }

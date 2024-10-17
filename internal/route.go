@@ -144,43 +144,9 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
 	}
-	lenderId := expenseRequest.LenderId
-	expenseType := expenseRequest.Type
-	users := expenseRequest.Users
-	amount := expenseRequest.Amount
-	description := expenseRequest.Description
-	var expenseBorrowers []*ExpenseBorrower
-	if expenseType == "equal" {
-		splitAmount := amount / float64(len(users))
-		for _, userId := range users {
-			if userId == lenderId {
-				continue
-			}
-			expenseBorrowers = append(expenseBorrowers, &ExpenseBorrower{
-				BorrowerId: userId,
-				Amount:     splitAmount,
-			})
-		}
-	} else if expenseType == "percent" {
-		percents := expenseRequest.Percents
-		for i, userId := range users {
-			if userId == lenderId {
-				continue
-			}
-			splitAmount := percents[i] * amount / 100
-			expenseBorrowers = append(expenseBorrowers, &ExpenseBorrower{
-				BorrowerId: userId,
-				Amount:     splitAmount,
-			})
-		}
-	} else if expenseType == "exact" {
-		for i, userId := range users {
-			expenseBorrowers = append(expenseBorrowers, &ExpenseBorrower{
-				BorrowerId: userId,
-				Amount:     expenseRequest.Values[i],
-			})
-		}
-	} else {
+	// Split the expense amount based on the type of expense
+	splitService, err := SplitServiceInit(expenseRequest)
+	if err != nil {
 		statusCode = http.StatusBadRequest
 		errMsg := "error: expenseType should be in equal, percent, exact"
 		Log.Error(fmt.Sprintf("create expense error: %s", errMsg))
@@ -188,6 +154,14 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 		json.NewEncoder(w).Encode(ErrorResp(&statusCode, &errMsg, nil))
 		return
 	}
+	expenseBorrowers := splitService.SplitAmount()
+
+	lenderId := expenseRequest.LenderId
+	expenseType := expenseRequest.Type
+	amount := expenseRequest.Amount
+	description := expenseRequest.Description
+	// Add Expense to Database
+	Log.Info("Adding Expense To Database")
 	if err := es.service.Add(&ctx, expenseType, amount, description, lenderId, expenseBorrowers); err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
@@ -200,7 +174,8 @@ func (es *ExpenseHandler) CreateExpense(w http.ResponseWriter, r *http.Request) 
 	for _, expenseBorrower := range expenseBorrowers {
 		lenders = append(lenders, NewLender(lenderId, expenseBorrower.BorrowerId, expenseBorrower.Amount))
 	}
-
+	// Upsert the lenders to database
+	Log.Info("Upserting Lenders To Database")
 	if err := Parallelize(&ctx, es.lenderService.Upsert, lenders); err != nil {
 		statusCode = http.StatusInternalServerError
 		errMsg := err.Error()
